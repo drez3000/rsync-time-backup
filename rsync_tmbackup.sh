@@ -37,7 +37,7 @@ fn_display_usage() {
 	echo "Options"
 	echo " -p, --port             SSH port."
 	echo " -h, --help             Display this help message."
-	echo " -i, --id_rsa           Specify the private ssh key to use."
+	echo " -i, --ssh-identity           Specify the private ssh key to use."
 	echo " --rsync-get-flags      Display the default rsync flags that are used for backup. If using remote"
 	echo "                        drive over SSH, --compress will be added."
 	echo " --rsync-set-flags      Set the rsync flags that are going to be used for backup."
@@ -180,8 +180,8 @@ fn_parse_ssh() {
 		SSH_USER=$(echo "$DEST_FOLDER" | sed -E  's/^([A-Za-z0-9\._%\+\-]+)@([A-Za-z0-9.\-]+)\:(.+)$/\1/')
 		SSH_HOST=$(echo "$DEST_FOLDER" | sed -E  's/^([A-Za-z0-9\._%\+\-]+)@([A-Za-z0-9.\-]+)\:(.+)$/\2/')
 		SSH_DEST_FOLDER=$(echo "$DEST_FOLDER" | sed -E  's/^([A-Za-z0-9\._%\+\-]+)@([A-Za-z0-9.\-]+)\:(.+)$/\3/')
-		if [ -n "$ID_RSA" ] ; then
-			SSH_CMD="ssh -p $SSH_PORT -i $ID_RSA ${SSH_USER}@${SSH_HOST}"
+		if [ -n "$SSH_IDENTITY" ] ; then
+			SSH_CMD="ssh -p $SSH_PORT -i $SSH_IDENTITY ${SSH_USER}@${SSH_HOST}"
 		else
 			SSH_CMD="ssh -p $SSH_PORT ${SSH_USER}@${SSH_HOST}"
 		fi
@@ -191,8 +191,8 @@ fn_parse_ssh() {
 		SSH_USER=$(echo "$SRC_FOLDER" | sed -E  's/^([A-Za-z0-9\._%\+\-]+)@([A-Za-z0-9.\-]+)\:(.+)$/\1/')
 		SSH_HOST=$(echo "$SRC_FOLDER" | sed -E  's/^([A-Za-z0-9\._%\+\-]+)@([A-Za-z0-9.\-]+)\:(.+)$/\2/')
 		SSH_SRC_FOLDER=$(echo "$SRC_FOLDER" | sed -E  's/^([A-Za-z0-9\._%\+\-]+)@([A-Za-z0-9.\-]+)\:(.+)$/\3/')
-		if [ -n "$ID_RSA" ] ; then
-			SSH_CMD="ssh -p $SSH_PORT -i $ID_RSA ${SSH_USER}@${SSH_HOST}"
+		if [ -n "$SSH_IDENTITY" ] ; then
+			SSH_CMD="ssh -p $SSH_PORT -i $SSH_IDENTITY ${SSH_USER}@${SSH_HOST}"
 		else
 			SSH_CMD="ssh -p $SSH_PORT ${SSH_USER}@${SSH_HOST}"
 		fi
@@ -270,7 +270,7 @@ SSH_CMD=""
 SSH_DEST_FOLDER_PREFIX=""
 SSH_SRC_FOLDER_PREFIX=""
 SSH_PORT="22"
-ID_RSA=""
+SSH_IDENTITY=""
 
 SRC_FOLDER=""
 DEST_FOLDER=""
@@ -292,9 +292,9 @@ while :; do
 			shift
 			SSH_PORT=$1
 			;;
-		-i|--id_rsa)
+		-i|--ssh-identity)
 			shift
-			ID_RSA="$1"
+			SSH_IDENTITY="$1"
 			;;
 		--rsync-get-flags)
 			shift
@@ -546,8 +546,8 @@ while : ; do
 	CMD="rsync"
 	if [ -n "$SSH_CMD" ]; then
 		RSYNC_FLAGS="$RSYNC_FLAGS --compress"
-		if [ -n "$ID_RSA" ] ; then
-			CMD="$CMD  -e 'ssh -p $SSH_PORT -i $ID_RSA -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
+		if [ -n "$SSH_IDENTITY" ] ; then
+			CMD="$CMD  -e 'ssh -p $SSH_PORT -i $SSH_IDENTITY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
 		else
 			CMD="$CMD  -e 'ssh -p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
 		fi
