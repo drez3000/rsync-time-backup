@@ -547,9 +547,9 @@ while : ; do
 	if [ -n "$SSH_CMD" ]; then
 		RSYNC_FLAGS="$RSYNC_FLAGS --compress"
 		if [ -n "$SSH_IDENTITY" ] ; then
-			CMD="$CMD  -e 'ssh -p $SSH_PORT -i $SSH_IDENTITY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
+			CMD="$CMD  -e 'ssh -p $SSH_PORT -i $SSH_IDENTITY"
 		else
-			CMD="$CMD  -e 'ssh -p $SSH_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
+			CMD="$CMD  -e 'ssh -p $SSH_PORT"
 		fi
 	fi
 	CMD="$CMD $RSYNC_FLAGS"
