@@ -278,8 +278,8 @@ SSH_IDENTITY=""
 
 SRC_FOLDER=""
 DEST_FOLDER=""
-LOG_DIR="$HOME/.$APPNAME"
 EXCLUDE_FROM=""
+LOG_DIR="$HOME/.local/log/$APPNAME"
 AUTO_DELETE_LOG="1"
 EXPIRATION_STRATEGY="1:1 30:7 365:30"
 AUTO_EXPIRE="0"
@@ -447,7 +447,7 @@ MYPID="$$"
 
 if [ ! -d "$LOG_DIR" ]; then
 	fn_log_info "Creating log folder in '$LOG_DIR'..."
-	mkdir -- "$LOG_DIR"
+	mkdir -p "$LOG_DIR"
 fi
 
 # -----------------------------------------------------------------------------
