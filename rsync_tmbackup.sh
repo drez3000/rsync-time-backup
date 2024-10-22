@@ -62,7 +62,7 @@ fn_display_usage() {
 	echo ""
 	echo "For more detailed help, please see the README file:"
 	echo ""
-	echo "https://github.com/laurent22/rsync-time-backup/blob/master/README.md"
+	echo "https://github.com/drez3000/rsync-time-backup/blob/master/README.md"
 }
 
 fn_parse_date() {

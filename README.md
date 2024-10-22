@@ -1,5 +1,7 @@
 # Rsync time backup
 
+This is a (currently WIP) fork from https://github.com/laurent22/rsync-time-backup
+
 This script offers Time Machine-style backup using rsync. It creates incremental backups of files and directories to the destination of your choice. The backups are structured in a way that makes it easy to recover any file at any point in time.
 
 It works on Linux, macOS and Windows (via WSL or Cygwin). The main advantage over Time Machine is the flexibility as it can backup from/to any filesystem and works on any platform. You can also backup, for example, to a Truecrypt drive without any problem.
@@ -7,30 +9,40 @@ It works on Linux, macOS and Windows (via WSL or Cygwin). The main advantage ove
 On macOS, it has a few disadvantages compared to Time Machine - in particular it does not auto-start when the backup drive is plugged (though it can be achieved using a launch agent), it requires some knowledge of the command line, and no specific GUI is provided to restore files. Instead files can be restored by using any file explorer, including Finder, or the command line.
 
 ## Installation
-
-	git clone https://github.com/laurent22/rsync-time-backup
+```
+	git clone https://github.com/drez3000/rsync-time-backup
+```
 
 ## Usage
 
-	Usage: rsync_tmbackup.sh [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION> [exclude-pattern-file]
+```
+Usage: rsync_tmbackup.sh [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION>
 
-	Options
-	 -p, --port             SSH port.
-	 -h, --help             Display this help message.
-	 -i, --id_rsa           Specify the private ssh key to use.
-	 --rsync-get-flags      Display the default rsync flags that are used for backup. If using remote
-	                        drive over SSH, --compress will be added.
-	 --rsync-set-flags      Set the rsync flags that are going to be used for backup.
-	 --rsync-append-flags   Append the rsync flags that are going to be used for backup.
-	 --log-dir              Set the log file directory. If this flag is set, generated files will
-	                        not be managed by the script - in particular they will not be
-	                        automatically deleted.
-	                        Default: /home/backuper/.rsync_tmbackup
-	 --strategy             Set the expiration strategy. Default: "1:1 30:7 365:30" means after one
-	                        day, keep one backup per day. After 30 days, keep one backup every 7 days.
-	                        After 365 days keep one backup every 30 days.
-	 --no-auto-expire       Disable automatically deleting backups when out of space. Instead an error
-	                        is logged, and the backup is aborted.
+Options
+ -p, --port               SSH port.
+ -h, --help               Display this help message.
+ -i, --ssh-identity       Specify the private ssh key to use.
+ --rsync-get-flags        Display the default rsync flags that are used for backup. If using remote
+                          drive over SSH, --compress will be added.
+ --rsync-set-flags        Set the rsync flags that are going to be used for backup.
+ --rsync-append-flags     Append the rsync flags that are going to be used for backup.
+ --log-dir                Set the log file directory. If this flag is set, generated files will
+                          not be managed by the script - in particular they will not be
+                          automatically deleted.
+                          Default: /Users/vivek/.local/log/rsync_tmbackup
+ --strategy               Set the expiration strategy. Default: "1:1 30:7 365:30" means after one
+                          day, keep one backup per day. After 30 days, keep one backup every 7 days.
+                          After 365 days keep one backup every 30 days.
+ --auto-expire            Enable automatically deleting backups when out of space. If unset, an error
+                          is logged, and the backup is aborted.
+ --max-backup-size        Maximum backup directory size. If set, an out of space error will be 
+                          generated before running an action that would cause the backup destination 
+                          to exceed the set value. Script will then behave according to current
+                          --auto-expire value set. Accepts byte values and (case insensitive)
+                          suffixes K, Kb, M, Mb, G, Gb, T, Tb.
+ --exclude-from           Path to an exclusion patterns file to be passed to rsync --exclude-from 
+                          value.
+```
 
 ## Features
 
@@ -53,25 +65,27 @@ On macOS, it has a few disadvantages compared to Time Machine - in particular it
 ## Examples
 	
 * Backup the home folder to backup_drive
-	
-		rsync_tmbackup.sh /home /mnt/backup_drive  
-
+```
+	rsync_tmbackup.sh /home /mnt/backup_drive  
+```
 * Backup with exclusion list:
-	
-		rsync_tmbackup.sh /home /mnt/backup_drive excluded_patterns.txt
-
+```
+	rsync_tmbackup.sh /home /mnt/backup_drive excluded_patterns.txt
+```
 * Backup to remote drive over SSH, on port 2222:
-
-		rsync_tmbackup.sh -p 2222 /home user@example.com:/mnt/backup_drive
-
+```
+	rsync_tmbackup.sh -p 2222 /home user@example.com:/mnt/backup_drive
+```
 
 * Backup from remote drive over SSH:
-
-		rsync_tmbackup.sh user@example.com:/home /mnt/backup_drive
+```
+	rsync_tmbackup.sh user@example.com:/home /mnt/backup_drive
+```
 
 * To mimic Time Machine's behaviour, a cron script can be setup to backup at regular interval. For example, the following cron job checks if the drive "/mnt/backup" is currently connected and, if it is, starts the backup. It does this check every 1 hour.
-		
-		0 */1 * * * if grep -qs /mnt/backup /proc/mounts; then rsync_tmbackup.sh /home /mnt/backup; fi
+```
+	0 */1 * * * if grep -qs /mnt/backup /proc/mounts; then rsync_tmbackup.sh /home /mnt/backup; fi
+```
 
 ## Backup expiration logic
 
@@ -94,24 +108,37 @@ The script is designed so that only one backup operation can be active for a giv
 ## Rsync options
 
 To display the rsync options that are used for backup, run `./rsync_tmbackup.sh --rsync-get-flags`. It is also possible to add or remove options using the `--rsync-append-flags` or `--rsync-set-flags` option. For example, to exclude backing up permissions and groups:
-
+```
 	rsync_tmbackup --rsync-append-flags "--no-perms --no-group" /src /dest
+```
 
 ## No automatic backup expiration
 
-An option to disable the default behaviour to purge old backups when out of space. This option is set with the `--no-auto-expire` flag.
-	
-	
+Backups are not automatically expired to prevent accidental data loss. To enable automatic purge of old backups when out of space, the `--auto-expire` flag must be provided.
+
+
 ## How to restore
 
 The script creates a backup in a regular directory so you can simply copy the files back to the original directory. You could do that with something like `rsync -aP /path/to/last/backup/ /path/to/restore/to/`. Consider using the `--dry-run` option to check what exactly is going to be copied. Use `--delete` if you also want to delete files that exist in the destination but not in the backup (obviously extra care must be taken when using this option).
 
 ## Extensions
 
+(Untested in current fork)
+
 * [rtb-wrapper](https://github.com/thomas-mc-work/rtb-wrapper): Allows creating backup profiles in config files. Handles both backup and restore operations.
 * [time-travel](https://github.com/joekerna/time-travel): Smooth integration into OSX Notification Center
 
 ## TODO
+
+### Fork:
+
+* Shellcheck + strict mode compliance
+* Test on remotes
+* Extend parser to accept options with "=" suffix
+* Extend parser to accept both options after arguments and arguments after options
+* Handle no arguments, currently fails with unbound variable $1
+
+### Original:
 
 * Check source and destination file-system (`df -T /dest`). If one of them is FAT, use the --modify-window rsync parameter (see `man rsync`) with a value of 1 or 2
 * Add `--whole-file` arguments on Windows? See http://superuser.com/a/905415/73619
