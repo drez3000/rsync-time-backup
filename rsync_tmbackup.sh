@@ -68,6 +68,10 @@ fn_display_usage() {
 	echo "https://github.com/drez3000/rsync-time-backup/blob/master/README.md"
 }
 
+log() {
+    echo "[DEBUG] $(date +'%Y-%m-%d %H:%M:%S') - $1" >> logfile.log
+}
+
 fn_parse_date() {
 	# Converts YYYY-MM-DD-HHMMSS to YYYY-MM-DD HH:MM:SS and then to Unix Epoch.
 	case "$OSTYPE" in
@@ -78,13 +82,14 @@ fn_parse_date() {
 			# Under MacOS X Tiger
 			# Or with GNU 'coreutils' installed (by homebrew)
 			#   'date -j' doesn't work, so we do this:
-			yy=$(expr ${1:0:4})
-			mm=$(expr ${1:5:2} - 1)
-			dd=$(expr ${1:8:2})
-			hh=$(expr ${1:11:2})
-			mi=$(expr ${1:13:2})
-			ss=$(expr ${1:15:2})
-			perl -e 'use Time::Local; print timelocal('$ss','$mi','$hh','$dd','$mm','$yy'),"\n";' ;;
+			yy=${1:0:4}
+			mm=$(( ${1:5:2} - 1 ))
+			dd=${1:8:2}
+			hh=${1:11:2}
+			mi=${1:13:2}
+			ss=${1:15:2}
+
+			perl -e 'use Time::Local; print timelocal('"$ss"','"$mi"','"$hh"','"$dd"','"$mm"','"$yy"'),"\n";' ;;
 	esac
 }
 
@@ -95,7 +100,7 @@ fn_parse_size() {
 
 	# Convert the input to lowercase for case insensitivity
 	input=$(echo "$input" | tr '[:upper:]' '[:lower:]')
-	value=$(echo $input | sed 's/[^0-9.].*//g')
+	value=$(echo "$input" | sed 's/[^0-9.].*//g')
 	unit=$(echo "$input" | sed 's/[^a-z]//g')
 
 	# Check for suffix and set the multiplier
@@ -121,14 +126,16 @@ fn_parse_size() {
 			;;
 	esac
 	
-	local multiplier=$((1024 ** magnitude))
-    local result=$(echo "$value * $multiplier" | bc | sed 's/\..*//g')
+	local multiplier
+	local result
+	multiplier=$((1024 ** magnitude))
+	result=$(echo "$value * $multiplier" | bc | sed 's/\..*//g')
 
-	echo $result
+	echo "$result"
 }
 
 fn_find_backups() {
-	fn_run_cmd_dest "find "$DEST_FOLDER/" -maxdepth 1 -type d -name \"????-??-??-??????\" -prune | sort -r"
+	fn_run_cmd_dest "find \"$DEST_FOLDER/\" -maxdepth 1 -type d -name \"????-??-??-??????\" -prune | sort -r"
 }
 
 fn_expire_backup() {
@@ -155,8 +162,10 @@ fn_expire_backups() {
 	# Process each backup dir from the oldest to the most recent
 	for backup_dir in $(fn_find_backups | sort); do
 
-		local backup_date=$(basename "$backup_dir")
-		local backup_timestamp=$(fn_parse_date "$backup_date")
+		local backup_date
+		local backup_timestamp
+		backup_date=$(basename "$backup_dir")
+		backup_timestamp=$(fn_parse_date "$backup_date")
 
 		# Skip if failed to parse date...
 		if [ -z "$backup_timestamp" ]; then
@@ -177,14 +186,16 @@ fn_expire_backups() {
 		fi
 
 		# Find which strategy token applies to this particular backup
-		for strategy_token in $(echo $EXPIRATION_STRATEGY | tr " " "\n" | sort -r -n); do
+		for strategy_token in $(echo "$EXPIRATION_STRATEGY" | tr " " "\n" | sort -r -n); do
 			IFS=':' read -r -a t <<< "$strategy_token"
 
 			# After which date (relative to today) this token applies (X) - we use seconds to get exact cut off time
-			local cut_off_timestamp=$((current_timestamp - ${t[0]} * 86400))
+			local cut_off_timestamp
+			cut_off_timestamp=$((current_timestamp - t[0] * 86400))
 
 			# Every how many days should a backup be kept past the cut off date (Y) - we use days (not seconds)
-			local cut_off_interval_days=$((${t[1]}))
+			local cut_off_interval_days
+			cut_off_interval_days=$((t[1]))
 
 			# If we've found the strategy token that applies to this backup
 			if [ "$backup_timestamp" -le "$cut_off_timestamp" ]; then
@@ -196,9 +207,12 @@ fn_expire_backups() {
 				fi
 
 				# we calculate days number since last kept backup
-				local last_kept_timestamp_days=$((last_kept_timestamp / 86400))
-				local backup_timestamp_days=$((backup_timestamp / 86400))
-				local interval_since_last_kept_days=$((backup_timestamp_days - last_kept_timestamp_days))
+				local last_kept_timestamp_days
+				local backup_timestamp_days
+				local interval_since_last_kept_days
+				last_kept_timestamp_days=$((last_kept_timestamp / 86400))
+				backup_timestamp_days=$((backup_timestamp / 86400))
+				interval_since_last_kept_days=$((backup_timestamp_days - last_kept_timestamp_days))
 
 				# Check if the current backup is in the interval between
 				# the last backup that was kept and Y
@@ -255,7 +269,7 @@ fn_run_cmd_dest() {
 	then
 		eval "$SSH_CMD '$1'"
 	else
-		eval $1
+		eval "$1"
 	fi
 }
 
@@ -264,7 +278,7 @@ fn_run_cmd_src() {
 	then
 		eval "$SSH_CMD '$1'"
 	else
-		eval $1
+		eval "$1"
 	fi
 }
 
@@ -483,8 +497,6 @@ fi
 # Date logic
 NOW=$(date +"%Y-%m-%d-%H%M%S")
 EPOCH=$(date "+%s")
-KEEP_ALL_DATE=$((EPOCH - 86400))       # 1 day ago
-KEEP_DAILIES_DATE=$((EPOCH - 2678400)) # 31 days ago
 
 export IFS=$'\n' # Better for handling spaces in filenames.
 DEST="$DEST_FOLDER/$NOW"
@@ -511,7 +523,7 @@ if [ -n "$(fn_find "$INPROGRESS_FILE")" ]; then
 		RUNNINGPID="$(fn_run_cmd_dest "cat $INPROGRESS_FILE")"
 
 		# 2. Get the command for the process currently running under that PID and look for our script name
-		RUNNINGCMD="$(procps -wwfo cmd -p $RUNNINGPID --no-headers | grep "$APPNAME")"
+		RUNNINGCMD="$(procps -wwfo cmd -p "$RUNNINGPID" --no-headers | grep "$APPNAME")"
 
 		# 3. Grab the exit code from grep (0=found, 1=not found)
 		GREPCODE=$?
@@ -625,10 +637,10 @@ while : ; do
 	# -----------------------------------------------------------------------------
 	
 	total_size_before_bytes=$(fn_run_cmd_dest "du -h -s $DEST_FOLDER" | awk '{ print $1 }')
-	total_size_before_bytes=$(fn_parse_size $total_size_before_bytes)
-	total_size_after_bytes=$(eval $DRY | grep -i "total size is" | sed -E 's/[^0-9\.]+//i' | sed 's/ .*//')
-	total_size_after_bytes=$(fn_parse_size $total_size_after_bytes)
-	max_size_bytes=$(fn_parse_size $MAX_BACKUP_SIZE)
+	total_size_before_bytes=$(fn_parse_size "$total_size_before_bytes")
+	total_size_after_bytes=$(eval "$DRY" | grep -i "total size is" | sed -E 's/[^0-9\.]+//i' | sed 's/ .*//')
+	total_size_after_bytes=$(fn_parse_size "$total_size_after_bytes")
+	max_size_bytes=$(fn_parse_size "$MAX_BACKUP_SIZE")
 	
 	NO_SPACE_LEFT=false
 	if [[ $total_size_after_bytes -gt $max_size_bytes ]]; then
@@ -644,8 +656,8 @@ while : ; do
 		fn_log_info "Running command:"
 		fn_log_info "$CMD"
 		fn_run_cmd_dest "echo $MYPID > $INPROGRESS_FILE"
-		eval $CMD
-		no_space_logged=$(cat $LOG_FILE | grep "No space left on device (28)\|Result too large (34)" || true)
+		eval "$CMD"
+		no_space_logged=$(cat "$LOG_FILE" | grep "No space left on device (28)\|Result too large (34)" || true)
 		if [[ -n "$no_space_logged" ]]; then
 			NO_SPACE_LEFT=true
 		fi
@@ -657,7 +669,7 @@ while : ; do
 
 	if [[ "$NO_SPACE_LEFT" == "true" ]]; then
 
-		if [[ $AUTO_EXPIRE == "0" ]]; then
+		if [[ "$AUTO_EXPIRE" == "0" ]]; then
 			fn_log_error "No space left on device, and automatic purging of old backups is disabled."
 			exit 1
 		fi
@@ -686,10 +698,10 @@ while : ; do
 		fn_log_warn "Rsync reported a warning. Run this command for more details: grep -E 'rsync:|rsync error:' '$LOG_FILE'"
 	else
 		fn_log_info "Backup completed without errors."
-		if [[ $AUTO_DELETE_LOG == "1" ]]; then
+		if [[ "$AUTO_DELETE_LOG" == "1" ]]; then
 			rm -f -- "$LOG_FILE"
 		fi
-		EXIT_CODE="0"
+		EXIT_CODE=0
 	fi
 
 	# -----------------------------------------------------------------------------
