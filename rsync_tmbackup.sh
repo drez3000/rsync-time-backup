@@ -100,8 +100,8 @@ fn_parse_size() {
 
 	# Convert the input to lowercase for case insensitivity
 	input=$(echo "$input" | tr '[:upper:]' '[:lower:]')
-	value=$(echo "$input" | sed 's/[^0-9.].*//g')
-	unit=$(echo "$input" | sed 's/[^a-z]//g')
+	value="${input//[^0-9.]/}"
+	unit="${input//[^a-z]/}"
 
 	# Check for suffix and set the multiplier
 	case "$unit" in
@@ -340,9 +340,9 @@ SRC_FOLDER=""
 DEST_FOLDER=""
 EXCLUDE_FROM=""
 LOG_DIR="$HOME/.local/log/$APPNAME"
-AUTO_DELETE_LOG="1"
+AUTO_DELETE_LOG=1
 EXPIRATION_STRATEGY="1:1 30:7 365:30"
-AUTO_EXPIRE="0"
+AUTO_EXPIRE=0
 MAX_BACKUP_SIZE=""
 
 RSYNC_FLAGS="-D --numeric-ids --links --hard-links --one-file-system --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
@@ -381,7 +381,7 @@ while :; do
 		--log-dir)
 			shift
 			LOG_DIR="$1"
-			AUTO_DELETE_LOG="0"
+			AUTO_DELETE_LOG=0
 			;;
 		--exclude-from)
 			shift
@@ -392,7 +392,7 @@ while :; do
 			MAX_BACKUP_SIZE="$1" # TODO: parse here
 			;;
 		--auto-expire)
-			AUTO_EXPIRE="1"
+			AUTO_EXPIRE=1
 			;;
 		--)
 			shift
@@ -641,25 +641,21 @@ while : ; do
 	total_size_after_bytes=$(eval "$DRY" | grep -i "total size is" | sed -E 's/[^0-9\.]+//i' | sed 's/ .*//')
 	total_size_after_bytes=$(fn_parse_size "$total_size_after_bytes")
 	max_size_bytes=$(fn_parse_size "$MAX_BACKUP_SIZE")
-	
-	NO_SPACE_LEFT=false
-	if [[ $total_size_after_bytes -gt $max_size_bytes ]]; then
-		echo "No space left!"
-		NO_SPACE_LEFT=true
-	fi
+
+	NO_SPACE_LEFT=$(( total_size_after_bytes > max_size_bytes ? 1 : 0 ))
 	
 	# -----------------------------------------------------------------------------
 	# Run rsync
 	# -----------------------------------------------------------------------------
 
-	if [[ "$NO_SPACE_LEFT" == "false" ]]; then
+	if [[ "$NO_SPACE_LEFT" == 0 ]]; then
 		fn_log_info "Running command:"
 		fn_log_info "$CMD"
 		fn_run_cmd_dest "echo $MYPID > $INPROGRESS_FILE"
 		eval "$CMD"
 		no_space_logged=$(cat "$LOG_FILE" | grep "No space left on device (28)\|Result too large (34)" || true)
 		if [[ -n "$no_space_logged" ]]; then
-			NO_SPACE_LEFT=true
+			NO_SPACE_LEFT=1
 		fi
 	fi
 
@@ -667,9 +663,9 @@ while : ; do
 	# Check if we ran out of space
 	# -----------------------------------------------------------------------------
 
-	if [[ "$NO_SPACE_LEFT" == "true" ]]; then
+	if [[ "$NO_SPACE_LEFT" == 1 ]]; then
 
-		if [[ "$AUTO_EXPIRE" == "0" ]]; then
+		if [[ "$AUTO_EXPIRE" == 0 ]]; then
 			fn_log_error "No space left on device, and automatic purging of old backups is disabled."
 			exit 1
 		fi
@@ -691,14 +687,14 @@ while : ; do
 	# Check whether rsync reported any errors
 	# -----------------------------------------------------------------------------
 
-	EXIT_CODE="1"
-	if [ -n "$(grep "rsync error:" "$LOG_FILE")" ]; then
+	EXIT_CODE=1
+	if grep -q "rsync error:" "$LOG_FILE"; then
 		fn_log_error "Rsync reported an error. Run this command for more details: grep -E 'rsync:|rsync error:' '$LOG_FILE'"
-	elif [ -n "$(grep "rsync:" "$LOG_FILE")" ]; then
+	elif grep -q "rsync:" "$LOG_FILE"; then
 		fn_log_warn "Rsync reported a warning. Run this command for more details: grep -E 'rsync:|rsync error:' '$LOG_FILE'"
 	else
 		fn_log_info "Backup completed without errors."
-		if [[ "$AUTO_DELETE_LOG" == "1" ]]; then
+		if [[ "$AUTO_DELETE_LOG" == 1 ]]; then
 			rm -f -- "$LOG_FILE"
 		fi
 		EXIT_CODE=0
@@ -707,7 +703,7 @@ while : ; do
 	# -----------------------------------------------------------------------------
 	# Add symlink to last backup
 	# -----------------------------------------------------------------------------
-	if [ "$EXIT_CODE" = 0 ]; then
+	if [[ "$EXIT_CODE" == 0 ]]; then
 		# Create the latest symlink only when rsync succeeded
 		fn_rm_file "$DEST_FOLDER/latest"
 		fn_ln "$(basename -- "$DEST")" "$DEST_FOLDER/latest"
