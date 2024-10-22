@@ -49,8 +49,8 @@ fn_display_usage() {
 	echo " --strategy             Set the expiration strategy. Default: \"1:1 30:7 365:30\" means after one"
 	echo "                        day, keep one backup per day. After 30 days, keep one backup every 7 days."
 	echo "                        After 365 days keep one backup every 30 days."
-	echo " --no-auto-expire       Disable automatically deleting backups when out of space. Instead an error"
-	echo "                        is logged, and the backup is aborted."
+	echo " --auto-expire            Enable automatically deleting backups when out of space. If unset, an error"
+	echo "                          is logged, and the backup is aborted."
 	echo " --exclude-from           Path to an exclusion patterns file to be passed to rsync --exclude-from "
 	echo "                          value."
 	echo ""
@@ -281,7 +281,7 @@ LOG_DIR="$HOME/.$APPNAME"
 EXCLUDE_FROM=""
 AUTO_DELETE_LOG="1"
 EXPIRATION_STRATEGY="1:1 30:7 365:30"
-AUTO_EXPIRE="1"
+AUTO_EXPIRE="0"
 
 RSYNC_FLAGS="-D --numeric-ids --links --hard-links --one-file-system --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
 
@@ -321,12 +321,12 @@ while :; do
 			LOG_DIR="$1"
 			AUTO_DELETE_LOG="0"
 			;;
-		--no-auto-expire)
-			AUTO_EXPIRE="0"
 		--exclude-from)
 			shift
 			EXCLUDE_FROM="$1"
 			;;
+		--auto-expire)
+			AUTO_EXPIRE="1"
 			;;
 		--)
 			shift
