@@ -78,7 +78,7 @@ fn_parse_date() {
 }
 
 fn_find_backups() {
-	fn_run_cmd "find "$DEST_FOLDER/" -maxdepth 1 -type d -name \"????-??-??-??????\" -prune | sort -r"
+	fn_run_cmd_dest "find "$DEST_FOLDER/" -maxdepth 1 -type d -name \"????-??-??-??????\" -prune | sort -r"
 }
 
 fn_expire_backup() {
@@ -200,7 +200,7 @@ fn_parse_ssh() {
 	fi
 }
 
-fn_run_cmd() {
+fn_run_cmd_dest() {
 	if [ -n "$SSH_DEST_FOLDER_PREFIX" ]
 	then
 		eval "$SSH_CMD '$1'"
@@ -219,32 +219,32 @@ fn_run_cmd_src() {
 }
 
 fn_find() {
-	fn_run_cmd "find '$1'"  2>/dev/null
+	fn_run_cmd_dest "find '$1'"  2>/dev/null
 }
 
 fn_get_absolute_path() {
-	fn_run_cmd "cd '$1';pwd"
+	fn_run_cmd_dest "cd '$1';pwd"
 }
 
 fn_mkdir() {
-	fn_run_cmd "mkdir -p -- '$1'"
+	fn_run_cmd_dest "mkdir -p -- '$1'"
 }
 
 # Removes a file or symlink - not for directories
 fn_rm_file() {
-	fn_run_cmd "rm -f -- '$1'"
+	fn_run_cmd_dest "rm -f -- '$1'"
 }
 
 fn_rm_dir() {
-	fn_run_cmd "rm -rf -- '$1'"
+	fn_run_cmd_dest "rm -rf -- '$1'"
 }
 
 fn_touch() {
-	fn_run_cmd "touch -- '$1'"
+	fn_run_cmd_dest "touch -- '$1'"
 }
 
 fn_ln() {
-	fn_run_cmd "ln -s -- '$1' '$2'"
+	fn_run_cmd_dest "ln -s -- '$1' '$2'"
 }
 
 fn_test_file_exists_src() {
@@ -256,7 +256,8 @@ fn_df_t_src() {
 }
 
 fn_df_t() {
-	fn_run_cmd "df -T '${1}'"
+	fn_run_cmd_dest "df -T '${1}'"
+}
 }
 
 # -----------------------------------------------------------------------------
@@ -451,7 +452,7 @@ fi
 if [ -n "$(fn_find "$INPROGRESS_FILE")" ]; then
 	if [ "$OSTYPE" == "cygwin" ]; then
 		# 1. Grab the PID of previous run from the PID file
-		RUNNINGPID="$(fn_run_cmd "cat $INPROGRESS_FILE")"
+		RUNNINGPID="$(fn_run_cmd_dest "cat $INPROGRESS_FILE")"
 
 		# 2. Get the command for the process currently running under that PID and look for our script name
 		RUNNINGCMD="$(procps -wwfo cmd -p $RUNNINGPID --no-headers | grep "$APPNAME")"
@@ -465,13 +466,13 @@ if [ -n "$(fn_find "$INPROGRESS_FILE")" ]; then
 			exit 1
 		fi
 	elif [[ "$OSTYPE" == "netbsd"* ]]; then
-		RUNNINGPID="$(fn_run_cmd "cat $INPROGRESS_FILE")"
+		RUNNINGPID="$(fn_run_cmd_dest "cat $INPROGRESS_FILE")"
 		if ps -axp "$RUNNINGPID" -o "command" | grep "$APPNAME" > /dev/null; then
 			fn_log_error "Previous backup task is still active - aborting."
 			exit 1
 		fi
 	else
-		RUNNINGPID="$(fn_run_cmd "cat $INPROGRESS_FILE")"
+		RUNNINGPID="$(fn_run_cmd_dest "cat $INPROGRESS_FILE")"
 		if ps -p "$RUNNINGPID" -o command | grep "$APPNAME"
 		then
 			fn_log_error "Previous backup task is still active - aborting."
@@ -483,14 +484,14 @@ if [ -n "$(fn_find "$INPROGRESS_FILE")" ]; then
 		# - Last backup is moved to current backup folder so that it can be resumed.
 		# - 2nd to last backup becomes last backup.
 		fn_log_info "$SSH_DEST_FOLDER_PREFIX$INPROGRESS_FILE already exists - the previous backup failed or was interrupted. Backup will resume from there."
-		fn_run_cmd "mv -- $PREVIOUS_DEST $DEST"
+		fn_run_cmd_dest "mv -- $PREVIOUS_DEST $DEST"
 		if [ "$(fn_find_backups | wc -l)" -gt 1 ]; then
 			PREVIOUS_DEST="$(fn_find_backups | sed -n '2p')"
 		else
 			PREVIOUS_DEST=""
 		fi
 		# update PID to current process to avoid multiple concurrent resumes
-		fn_run_cmd "echo $MYPID > $INPROGRESS_FILE"
+		fn_run_cmd_dest "echo $MYPID > $INPROGRESS_FILE"
 	fi
 fi
 
@@ -564,7 +565,7 @@ while : ; do
 	fn_log_info "Running command:"
 	fn_log_info "$CMD"
 
-	fn_run_cmd "echo $MYPID > $INPROGRESS_FILE"
+	fn_run_cmd_dest "echo $MYPID > $INPROGRESS_FILE"
 	eval $CMD
 
 	# -----------------------------------------------------------------------------
