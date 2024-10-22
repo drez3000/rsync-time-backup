@@ -68,10 +68,6 @@ fn_display_usage() {
 	echo "https://github.com/drez3000/rsync-time-backup/blob/master/README.md"
 }
 
-log() {
-    echo "[DEBUG] $(date +'%Y-%m-%d %H:%M:%S') - $1" >> logfile.log
-}
-
 fn_parse_date() {
 	# Converts YYYY-MM-DD-HHMMSS to YYYY-MM-DD HH:MM:SS and then to Unix Epoch.
 	case "$OSTYPE" in
