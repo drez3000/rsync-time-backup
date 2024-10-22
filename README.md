@@ -19,9 +19,9 @@ On macOS, it has a few disadvantages compared to Time Machine - in particular it
 Usage: rsync_tmbackup.sh [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION>
 
 Options
- -p, --port               SSH port.
  -h, --help               Display this help message.
  -i, --ssh-identity       Specify the private ssh key to use.
+ -p, --ssh-port           SSH port.
  --rsync-get-flags        Display the default rsync flags that are used for backup. If using remote
                           drive over SSH, --compress will be added.
  --rsync-set-flags        Set the rsync flags that are going to be used for backup.
@@ -109,7 +109,7 @@ The script is designed so that only one backup operation can be active for a giv
 
 To display the rsync options that are used for backup, run `./rsync_tmbackup.sh --rsync-get-flags`. It is also possible to add or remove options using the `--rsync-append-flags` or `--rsync-set-flags` option. For example, to exclude backing up permissions and groups:
 ```
-	rsync_tmbackup --rsync-append-flags "--no-perms --no-group" /src /dest
+	rsync_tmbackup.sh --rsync-append-flags "--no-perms --no-group" /src /dest
 ```
 
 ## No automatic backup expiration
@@ -130,40 +130,10 @@ The script creates a backup in a regular directory so you can simply copy the fi
 
 ## TODO
 
-### Fork:
-
-* Shellcheck + strict mode compliance
-* Test on remotes
-* Extend parser to accept options with "=" suffix
-* Extend parser to accept both options after arguments and arguments after options
-* Handle no arguments, currently fails with unbound variable $1
-
-### Original:
-
 * Check source and destination file-system (`df -T /dest`). If one of them is FAT, use the --modify-window rsync parameter (see `man rsync`) with a value of 1 or 2
 * Add `--whole-file` arguments on Windows? See http://superuser.com/a/905415/73619
 * Minor changes (see TODO comments in the source).
 
 ## LICENSE
 
-The MIT License (MIT)
-
-Copyright (c) 2013-2024 Laurent Cozic
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+This is an open source project released under MIT license. See `LICENSE` file for details.
