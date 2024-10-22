@@ -98,10 +98,15 @@ fn_parse_size() {
 	input=$(echo "$input" | tr '[:upper:]' '[:lower:]')
 	value="${input//[^0-9.]/}"
 	unit="${input//[^a-z]/}"
+	
+	if [[ -z "$value" ]]; then
+		echo ""
+		return
+	fi
 
 	# Check for suffix and set the multiplier
 	case "$unit" in
-		"")
+		""|b)
 			magnitude=0
 			;;
 		kib|kb|k)
@@ -117,8 +122,8 @@ fn_parse_size() {
 			magnitude=4
 			;;
 		*)
-			echo "Error: Invalid size unit. Got: $unit" >&2
-			exit 1
+			echo ""
+			return
 			;;
 	esac
 	
