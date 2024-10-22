@@ -32,7 +32,7 @@ trap 'fn_terminate_script' SIGINT
 # Small utility functions for reducing code duplication
 # -----------------------------------------------------------------------------
 fn_display_usage() {
-	echo "Usage: $(basename "$0") [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION> [exclude-pattern-file]"
+	echo "Usage: $(basename "$0") [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION>"
 	echo ""
 	echo "Options"
 	echo " -p, --port             SSH port."
@@ -51,6 +51,8 @@ fn_display_usage() {
 	echo "                        After 365 days keep one backup every 30 days."
 	echo " --no-auto-expire       Disable automatically deleting backups when out of space. Instead an error"
 	echo "                        is logged, and the backup is aborted."
+	echo " --exclude-from           Path to an exclusion patterns file to be passed to rsync --exclude-from "
+	echo "                          value."
 	echo ""
 	echo "For more detailed help, please see the README file:"
 	echo ""
@@ -275,8 +277,8 @@ SSH_IDENTITY=""
 
 SRC_FOLDER=""
 DEST_FOLDER=""
-EXCLUSION_FILE=""
 LOG_DIR="$HOME/.$APPNAME"
+EXCLUDE_FROM=""
 AUTO_DELETE_LOG="1"
 EXPIRATION_STRATEGY="1:1 30:7 365:30"
 AUTO_EXPIRE="1"
@@ -321,12 +323,15 @@ while :; do
 			;;
 		--no-auto-expire)
 			AUTO_EXPIRE="0"
+		--exclude-from)
+			shift
+			EXCLUDE_FROM="$1"
+			;;
 			;;
 		--)
 			shift
 			SRC_FOLDER="$1"
 			DEST_FOLDER="$2"
-			EXCLUSION_FILE="$3"
 			break
 			;;
 		-*)
@@ -338,7 +343,6 @@ while :; do
 		*)
 			SRC_FOLDER="$1"
 			DEST_FOLDER="$2"
-			EXCLUSION_FILE="$3"
 			break
 	esac
 
@@ -379,7 +383,7 @@ fi
 # Now strip off last slash from source folder.
 SRC_FOLDER="${SRC_FOLDER%/}"
 
-for ARG in "$SRC_FOLDER" "$DEST_FOLDER" "$EXCLUSION_FILE"; do
+for ARG in "$SRC_FOLDER" "$DEST_FOLDER" "$EXCLUDE_FROM"; do
 	if [[ "$ARG" == *"'"* ]]; then
 		fn_log_error 'Source and destination directories may not contain single quote characters.'
 		exit 1
@@ -555,9 +559,9 @@ while : ; do
 	fi
 	CMD="$CMD $RSYNC_FLAGS"
 	CMD="$CMD --log-file '$LOG_FILE'"
-	if [ -n "$EXCLUSION_FILE" ]; then
-		# We've already checked that $EXCLUSION_FILE doesn't contain a single quote
-		CMD="$CMD --exclude-from '$EXCLUSION_FILE'"
+	if [ -n "$EXCLUDE_FROM" ]; then
+		# We've already checked that $EXCLUDE_FROM doesn't contain a single quote
+		CMD="$CMD --exclude-from '$EXCLUDE_FROM'"
 	fi
 	CMD="$CMD $LINK_DEST_OPTION"
 	CMD="$CMD -- '$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/' '$SSH_DEST_FOLDER_PREFIX$DEST/'"
