@@ -52,6 +52,11 @@ fn_display_usage() {
 	echo "                          After 365 days keep one backup every 30 days."
 	echo " --auto-expire            Enable automatically deleting backups when out of space. If unset, an error"
 	echo "                          is logged, and the backup is aborted."
+	echo " --max-backup-size        Maximum backup directory size. If set, an out of space error will be "
+	echo "                          generated before running an action that would cause the backup destination "
+	echo "                          to exceed the set value. Script will then behave according to current"
+	echo "                          --auto-expire value set. Accepts byte values and (case insensitive)"
+	echo "                          suffixes K, Kb, M, Mb, G, Gb, T, Tb."
 	echo " --exclude-from           Path to an exclusion patterns file to be passed to rsync --exclude-from "
 	echo "                          value."
 	echo ""
@@ -78,6 +83,45 @@ fn_parse_date() {
 			ss=$(expr ${1:15:2})
 			perl -e 'use Time::Local; print timelocal('$ss','$mi','$hh','$dd','$mm','$yy'),"\n";' ;;
 	esac
+}
+
+fn_parse_size() {
+    local input="$1"
+	local magnitude=0
+	local value=0
+
+	# Convert the input to lowercase for case insensitivity
+	input=$(echo "$input" | tr '[:upper:]' '[:lower:]')
+	value=$(echo $input | sed 's/[^0-9.].*//g')
+	unit=$(echo "$input" | sed 's/[^a-z]//g')
+
+	# Check for suffix and set the multiplier
+	case "$unit" in
+		"")
+			magnitude=0
+			;;
+		kib|kb|k)
+			magnitude=1
+			;;
+		mib|mb|m)
+			magnitude=2
+			;;
+		gib|gb|g)
+			magnitude=3
+			;;
+		tib|tb|t)
+			magnitude=4
+			;;
+		*)
+			echo "Error: Invalid size unit. Got: $unit" >&2
+			exit 1
+			;;
+	esac
+	
+	local multiplier=$((1024 ** magnitude))
+    local result=$(echo "$value * $multiplier" | bc | sed 's/\..*//g')
+
+	echo $result
 }
 
 fn_find_backups() {
@@ -282,6 +326,7 @@ LOG_DIR="$HOME/.local/log/$APPNAME"
 AUTO_DELETE_LOG="1"
 EXPIRATION_STRATEGY="1:1 30:7 365:30"
 AUTO_EXPIRE="0"
+MAX_BACKUP_SIZE=""
 
 RSYNC_FLAGS="-D --numeric-ids --links --hard-links --one-file-system --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
 
@@ -324,6 +369,10 @@ while :; do
 		--exclude-from)
 			shift
 			EXCLUDE_FROM="$1"
+			;;
+		--max-backup-size)
+			shift
+			MAX_BACKUP_SIZE="$1" # TODO: parse here
 			;;
 		--auto-expire)
 			AUTO_EXPIRE="1"
@@ -564,21 +613,46 @@ while : ; do
 		CMD="$CMD --exclude-from '$EXCLUDE_FROM'"
 	fi
 	CMD="$CMD $LINK_DEST_OPTION"
+	DRY="$CMD --dry-run"
 	CMD="$CMD -- '$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/' '$SSH_DEST_FOLDER_PREFIX$DEST/'"
+	DRY="$DRY -- '$SSH_SRC_FOLDER_PREFIX$SRC_FOLDER/' '$SSH_DEST_FOLDER_PREFIX$DEST/'"
+	
+	# -----------------------------------------------------------------------------
+	# Verify expected new size
+	# -----------------------------------------------------------------------------
+	
+	total_size_before_bytes=$(fn_run_cmd_dest "du -h -s $DEST_FOLDER" | awk '{ print $1 }')
+	total_size_before_bytes=$(fn_parse_size $total_size_before_bytes)
+	total_size_after_bytes=$(eval $DRY | grep -i "total size is" | sed -E 's/[^0-9\.]+//i' | sed 's/ .*//')
+	total_size_after_bytes=$(fn_parse_size $total_size_after_bytes)
+	max_size_bytes=$(fn_parse_size $MAX_BACKUP_SIZE)
+	
+	NO_SPACE_LEFT=false
+	if [[ $total_size_after_bytes -gt $max_size_bytes ]]; then
+		echo "No space left!"
+		NO_SPACE_LEFT=true
+	fi
+	
+	# -----------------------------------------------------------------------------
+	# Run rsync
+	# -----------------------------------------------------------------------------
 
-	fn_log_info "Running command:"
-	fn_log_info "$CMD"
-
-	fn_run_cmd_dest "echo $MYPID > $INPROGRESS_FILE"
-	eval $CMD
+	if [[ "$NO_SPACE_LEFT" == "false" ]]; then
+		fn_log_info "Running command:"
+		fn_log_info "$CMD"
+		fn_run_cmd_dest "echo $MYPID > $INPROGRESS_FILE"
+		eval $CMD
+		no_space_logged=$(cat $LOG_FILE | grep "No space left on device (28)\|Result too large (34)" || true)
+		if [[ -n "$no_space_logged" ]]; then
+			NO_SPACE_LEFT=true
+		fi
+	fi
 
 	# -----------------------------------------------------------------------------
 	# Check if we ran out of space
 	# -----------------------------------------------------------------------------
 
-	NO_SPACE_LEFT="$(grep "No space left on device (28)\|Result too large (34)" "$LOG_FILE")"
-
-	if [ -n "$NO_SPACE_LEFT" ]; then
+	if [[ "$NO_SPACE_LEFT" == "true" ]]; then
 
 		if [[ $AUTO_EXPIRE == "0" ]]; then
 			fn_log_error "No space left on device, and automatic purging of old backups is disabled."
