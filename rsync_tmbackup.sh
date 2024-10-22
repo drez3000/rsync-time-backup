@@ -261,7 +261,6 @@ fn_df_t_src() {
 fn_df_t() {
 	fn_run_cmd_dest "df -T '${1}'"
 }
-}
 
 # -----------------------------------------------------------------------------
 # Source and destination information
