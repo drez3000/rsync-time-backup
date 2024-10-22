@@ -340,11 +340,11 @@ SSH_IDENTITY=""
 SRC_FOLDER=""
 DEST_FOLDER=""
 EXCLUDE_FROM=""
+MAX_BACKUP_SIZE_BYTES=""
 LOG_DIR="$HOME/.local/log/$APPNAME"
 AUTO_DELETE_LOG=1
 EXPIRATION_STRATEGY="1:1 30:7 365:30"
 AUTO_EXPIRE=0
-MAX_BACKUP_SIZE=""
 
 RSYNC_FLAGS="-D --numeric-ids --links --hard-links --one-file-system --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
 
@@ -390,7 +390,13 @@ while :; do
 			;;
 		--max-backup-size)
 			shift
-			MAX_BACKUP_SIZE="$1" # TODO: parse here
+			MAX_BACKUP_SIZE_BYTES=$(fn_parse_size "$1")
+			if [[ -z "$MAX_BACKUP_SIZE_BYTES" ]]; then
+				fn_log_error "Failed to parse --max-backup-size: \"$1\""
+				fn_log_info ""
+				fn_display_usage
+				exit 1
+			fi
 			;;
 		--auto-expire)
 			AUTO_EXPIRE=1
@@ -607,6 +613,8 @@ while : ; do
 	# Start backup
 	# -----------------------------------------------------------------------------
 
+	EXIT_CODE=0
+	NO_SPACE_LEFT=0
 	LOG_FILE="$LOG_DIR/$(date +"%Y-%m-%d-%H%M%S").log"
 
 	fn_log_info "Starting backup..."
@@ -636,20 +644,28 @@ while : ; do
 	# -----------------------------------------------------------------------------
 	# Verify expected new size
 	# -----------------------------------------------------------------------------
-	
-	total_size_before_bytes=$(fn_run_cmd_dest "du -h -s $DEST_FOLDER" | awk '{ print $1 }')
-	total_size_before_bytes=$(fn_parse_size "$total_size_before_bytes")
-	total_size_after_bytes=$(eval "$DRY" | grep -i "total size is" | sed -E 's/[^0-9\.]+//i' | sed 's/ .*//')
-	total_size_after_bytes=$(fn_parse_size "$total_size_after_bytes")
-	max_size_bytes=$(fn_parse_size "$MAX_BACKUP_SIZE")
 
-	NO_SPACE_LEFT=$(( total_size_after_bytes > max_size_bytes ? 1 : 0 ))
-	
+	if [[ -n "$MAX_BACKUP_SIZE_BYTES" ]]; then
+		total_size_before=$(fn_run_cmd_dest "du -h -s $DEST_FOLDER" | awk '{ print $1 }')
+		total_size_before_bytes=$(fn_parse_size "$total_size_before")
+		total_size_after=$(eval "$DRY" | grep -i "total size is" | sed -E 's/[^0-9\.]+//i' | sed 's/ .*//')
+		total_size_after_bytes=$(fn_parse_size "$total_size_after")
+		NO_SPACE_LEFT=$(( total_size_after_bytes > MAX_BACKUP_SIZE_BYTES ? 1 : 0 ))
+		if [[ -z "$total_size_before_bytes" ]]; then
+			fn_log_error "Failed to parse current backup size. Got: \"$total_size_before\""
+			EXIT_CODE=1
+		fi
+		if [[ -z "$total_size_after_bytes" ]]; then
+			fn_log_error "Failed to parse expected resulting backup size. Got: \"$total_size_after\""
+			EXIT_CODE=1
+		fi
+	fi
+
 	# -----------------------------------------------------------------------------
 	# Run rsync
 	# -----------------------------------------------------------------------------
 
-	if [[ "$NO_SPACE_LEFT" == 0 ]]; then
+	if [[ "$EXIT_CODE" != 1 && "$NO_SPACE_LEFT" == 0 ]]; then
 		fn_log_info "Running command:"
 		fn_log_info "$CMD"
 		fn_run_cmd_dest "echo $MYPID > $INPROGRESS_FILE"
@@ -664,7 +680,7 @@ while : ; do
 	# Check if we ran out of space
 	# -----------------------------------------------------------------------------
 
-	if [[ "$NO_SPACE_LEFT" == 1 ]]; then
+	if [[ "$EXIT_CODE" != 1 && "$NO_SPACE_LEFT" == 1 ]]; then
 
 		if [[ "$AUTO_EXPIRE" == 0 ]]; then
 			fn_log_error "No space left on device, and automatic purging of old backups is disabled."
@@ -687,18 +703,17 @@ while : ; do
 	# -----------------------------------------------------------------------------
 	# Check whether rsync reported any errors
 	# -----------------------------------------------------------------------------
-
-	EXIT_CODE=1
 	if grep -q "rsync error:" "$LOG_FILE"; then
 		fn_log_error "Rsync reported an error. Run this command for more details: grep -E 'rsync:|rsync error:' '$LOG_FILE'"
+		EXIT_CODE=1
 	elif grep -q "rsync:" "$LOG_FILE"; then
 		fn_log_warn "Rsync reported a warning. Run this command for more details: grep -E 'rsync:|rsync error:' '$LOG_FILE'"
+		EXIT_CODE=1
 	else
 		fn_log_info "Backup completed without errors."
 		if [[ "$AUTO_DELETE_LOG" == 1 ]]; then
 			rm -f -- "$LOG_FILE"
 		fi
-		EXIT_CODE=0
 	fi
 
 	# -----------------------------------------------------------------------------
