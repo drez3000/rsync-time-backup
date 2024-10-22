@@ -90,7 +90,7 @@ fn_parse_date() {
 }
 
 fn_parse_size() {
-    local input="$1"
+	local input="$1"
 	local magnitude=0
 	local value=0
 
