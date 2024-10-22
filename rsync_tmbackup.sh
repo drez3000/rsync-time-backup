@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 APPNAME=$(basename "$0" | sed "s/\.sh$//")
 
