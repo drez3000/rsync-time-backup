@@ -8,8 +8,11 @@ APPNAME=$(basename "$0" | sed "s/\.sh$//")
 # -----------------------------------------------------------------------------
 
 fn_log_info()  { echo "$APPNAME: $1"; }
+
 fn_log_warn()  { echo "$APPNAME: [WARNING] $1" 1>&2; }
+
 fn_log_error() { echo "$APPNAME: [ERROR] $1" 1>&2; }
+
 fn_log_info_cmd()  {
 	if [ -n "$SSH_DEST_FOLDER_PREFIX" ]; then
 		echo "$APPNAME: $SSH_CMD '$1'";
@@ -30,14 +33,14 @@ fn_terminate_script() {
 trap 'fn_terminate_script' SIGINT
 
 # -----------------------------------------------------------------------------
-# Small utility functions for reducing code duplication
+# Utility functions
 # -----------------------------------------------------------------------------
 fn_display_usage() {
 	echo "Usage: $(basename "$0") [OPTION]... <[USER@HOST:]SOURCE> <[USER@HOST:]DESTINATION>"
 	echo ""
 	echo "Options"
-	echo " -p, --port               SSH port."
 	echo " -h, --help               Display this help message."
+	echo " -p, --ssh-port           SSH port."
 	echo " -i, --ssh-identity       Specify the private ssh key to use."
 	echo " --rsync-get-flags        Display the default rsync flags that are used for backup. If using remote"
 	echo "                          drive over SSH, --compress will be added."
@@ -336,7 +339,7 @@ while :; do
 			fn_display_usage
 			exit
 			;;
-		-p|--port)
+		-p|--ssh-port)
 			shift
 			SSH_PORT=$1
 			;;
